@@ -18,14 +18,29 @@
 # Write your own HTTP GET and POST
 # The point is to understand what you have to send and get experience with it
 
+from ast import arguments
 import sys
 import socket
 import re
 # you may use urllib to encode data appropriately
 import urllib.parse
 
+DEFAULT_PORT = 80
+BUFFER_SIZE = 1024
+
 def help():
     print("httpclient.py [GET/POST] [URL]\n")
+
+def split_url(url):
+    match = re.match(r'https?:\/\/([\w\.]+)(?::(\d+))?(\/.+)?', url)
+    host = match.group(1)
+    port = int(match.group(2) or DEFAULT_PORT)
+    path = (match.group(3) or '/').split('?')[0]
+    return host, port, path
+
+def get_arguments(url):
+    match = re.search(r'\?(.+)', url)
+    return match.group(1) if match else ''
 
 class HTTPResponse(object):
     def __init__(self, code=200, body=""):
@@ -41,17 +56,18 @@ class HTTPClient(object):
         return None
 
     def get_code(self, data):
-        return None
+        match = re.match(r'HTTP\/\d\.\d (\d+)', data)
+        return int(match.group(1))
 
     def get_headers(self,data):
-        return None
+        return data.split('\r\n\r\n')[0]
 
     def get_body(self, data):
-        return None
-    
+        return data.split('\r\n\r\n')[1]
+
     def sendall(self, data):
         self.socket.sendall(data.encode('utf-8'))
-        
+
     def close(self):
         self.socket.close()
 
@@ -60,7 +76,7 @@ class HTTPClient(object):
         buffer = bytearray()
         done = False
         while not done:
-            part = sock.recv(1024)
+            part = sock.recv(BUFFER_SIZE)
             if (part):
                 buffer.extend(part)
             else:
@@ -68,13 +84,25 @@ class HTTPClient(object):
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
-        code = 500
-        body = ""
+        host, port, path = split_url(url)
+        self.connect(host, port)
+        self.sendall("GET %s HTTP/1.1\r\nHost: %s\r\n\r\n" % (path, host))
+        data = str(self.recvall(self.socket))
+        code = self.get_code(data)
+        body = self.get_body(data)
+        self.close()
         return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
-        code = 500
-        body = ""
+        post_request = "GET %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n\r\n%s"
+        host, port, path = split_url(url)
+        arguments = get_arguments(url)
+        self.connect(host, port)
+        self.sendall(post_request % (path, host, len(arguments), arguments))
+        data = str(self.recvall(self.socket))
+        code = self.get_code(data)
+        body = self.get_body(data)
+        self.close()
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
