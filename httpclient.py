@@ -47,6 +47,9 @@ class HTTPResponse(object):
         self.code = code
         self.body = body
 
+    def __str__(self):
+        return 'HTTP/1.1 %s\r\n\r\n%s' % (self.code, self.body)
+
 class HTTPClient(object):
     #def get_host_port(self,url):
 
