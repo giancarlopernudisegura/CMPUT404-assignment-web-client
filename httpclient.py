@@ -84,9 +84,14 @@ class HTTPClient(object):
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
+        get_request = "GET %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n\r\n%s"
+        if args:
+            arguments = urllib.parse.urlencode(args)
+        else:
+            arguments = ''
         host, port, path = split_url(url)
         self.connect(host, port)
-        self.sendall("GET %s HTTP/1.1\r\nHost: %s\r\n\r\n" % (path, host))
+        self.sendall(get_request % (path, host, len(arguments), arguments))
         data = str(self.recvall(self.socket))
         code = self.get_code(data)
         body = self.get_body(data)
@@ -97,6 +102,10 @@ class HTTPClient(object):
         post_request = "POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n\r\n%s"
         host, port, path = split_url(url)
         arguments = get_arguments(url)
+        if args:
+            if len(arguments) > 0:
+                arguments += '&'
+            arguments += urllib.parse.urlencode(args)
         self.connect(host, port)
         self.sendall(post_request % (path, host, len(arguments), arguments))
         data = str(self.recvall(self.socket))
